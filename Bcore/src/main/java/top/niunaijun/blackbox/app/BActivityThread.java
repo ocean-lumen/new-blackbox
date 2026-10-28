@@ -202,6 +202,29 @@ public class BActivityThread extends IBActivityThread.Stub {
         return mBoundApplication != null;
     }
 
+    /**
+     * createPackageContext() may hand back a different LoadedApk than the one makeApplication()
+     * ran on (e.g. when the cached one is no longer "up to date"). Such a LoadedApk has
+     * mApplication == null, so Service.getApplicationContext() returns null. Libraries that
+     * run in service processes (Firefox/Gecko child processes call
+     * getApplicationContext().getFilesDir()) then crash with an NPE and no web page loads.
+     * Point the service context at the bound LoadedApk and make sure it knows its Application.
+     */
+    private void bindContextToBoundApk(Context context) {
+        try {
+            if (mBoundApplication == null || mBoundApplication.info == null) {
+                return;
+            }
+            Object boundApk = mBoundApplication.info;
+            BRContextImpl.get(context)._set_mPackageInfo(boundApk);
+            if (BRLoadedApk.get(boundApk).mApplication() == null && mInitialApplication != null) {
+                BRLoadedApk.get(boundApk)._set_mApplication(mInitialApplication);
+            }
+        } catch (Throwable t) {
+            Slog.w(TAG, "bindContextToBoundApk failed: " + t.getMessage());
+        }
+    }
+
     public Service createService(ServiceInfo serviceInfo, IBinder token) {
         if (!BActivityThread.currentActivityThread().isInit()) {
             BActivityThread.currentActivityThread().bindApplication(serviceInfo.packageName, serviceInfo.processName);
@@ -233,6 +256,7 @@ public class BActivityThread extends IBActivityThread.Stub {
                     serviceInfo.packageName,
                     Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY
             );
+            bindContextToBoundApk(context);
             BRContextImpl.get(context).setOuterContext(service);
             BRService.get(service).attach(
                     context,
@@ -288,6 +312,7 @@ public class BActivityThread extends IBActivityThread.Stub {
                     serviceInfo.packageName,
                     Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY
             );
+            bindContextToBoundApk(context);
             BRContextImpl.get(context).setOuterContext(service);
             BRService.get(service).attach(
                     context,

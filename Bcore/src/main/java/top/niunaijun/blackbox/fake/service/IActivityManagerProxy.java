@@ -452,6 +452,22 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         }
     }
 
+    /**
+     * BindServiceCommon replaces the guest's IServiceConnection with a ServiceConnectionDelegate,
+     * so the system only knows the delegate. Apps (Gecko/Firefox child processes) later call
+     * Context.updateServiceGroup(connection, ...) with the ORIGINAL connection, and the system
+     * throws "IllegalArgumentException: Could not find connection". That exception escapes on
+     * Gecko's process-manager thread and the child (content/network) processes never finish
+     * setup, so no web page loads. The call only tunes process priority, so make it a no-op.
+     */
+    @ProxyMethod("updateServiceGroup")
+    public static class UpdateServiceGroup extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return null;
+        }
+    }
+
     @ProxyMethod("unbindService")
     public static class UnbindService extends MethodHook {
 
@@ -790,6 +806,13 @@ public class IActivityManagerProxy extends ClassInvocationStub {
                     || permission.equals(Manifest.permission.SEND_SMS)) {
                 return PackageManager.PERMISSION_GRANTED;
             }
+
+            // A guest app always holds the permissions it declares itself (e.g. AndroidX's
+            // <pkg>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION). The guest is not really installed,
+            // so the system would answer DENIED and ContextCompat.registerReceiver() throws.
+            if (isOwnPermission(permission, BActivityThread.getAppPackageName())) {
+                return PackageManager.PERMISSION_GRANTED;
+            }
             
             
             if (isAudioPermission(permission)) {
@@ -808,6 +831,12 @@ public class IActivityManagerProxy extends ClassInvocationStub {
     }
 
     
+    static boolean isOwnPermission(String permission, String packageName) {
+        return permission != null && packageName != null
+                && !permission.startsWith("android.")
+                && permission.startsWith(packageName + ".");
+    }
+
     private static boolean isAudioPermission(String permission) {
         if (permission == null) return false;
         return permission.equals(Manifest.permission.RECORD_AUDIO)

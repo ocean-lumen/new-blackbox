@@ -414,6 +414,11 @@ public class IPackageManagerProxy extends BinderInvocationStub {
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             String permission = (String) args[0];
             String packageName = (String) args[1];
+
+            // permissions declared by the guest app itself are always held by it
+            if (IActivityManagerProxy.isOwnPermission(permission, packageName)) {
+                return PackageManager.PERMISSION_GRANTED;
+            }
             
             
             if (isAudioPermission(permission)) {
@@ -444,6 +449,11 @@ public class IPackageManagerProxy extends BinderInvocationStub {
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             String permission = (String) args[0];
             String packageName = (String) args[1];
+
+            // permissions declared by the guest app itself are always held by it
+            if (IActivityManagerProxy.isOwnPermission(permission, packageName)) {
+                return PackageManager.PERMISSION_GRANTED;
+            }
             
             
             if (isAudioPermission(permission)) {
@@ -474,6 +484,11 @@ public class IPackageManagerProxy extends BinderInvocationStub {
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             String permission = (String) args[0];
             String packageName = (String) args[1];
+
+            // permissions declared by the guest app itself are always held by it
+            if (IActivityManagerProxy.isOwnPermission(permission, packageName)) {
+                return PackageManager.PERMISSION_GRANTED;
+            }
             
             
             if (isAudioPermission(permission)) {
